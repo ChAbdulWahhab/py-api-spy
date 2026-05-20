@@ -153,22 +153,17 @@ def paint_dashboard():
         slow_routes = list(spy_state.s)
         
     ram = get_ram_usage()
+    ram_str = f"{ram:.1f} MB"
     
-    lines = []
+    # 1. Base header rows (Fixed)
+    lines = [
+        "┌" + "─" * 70 + "┐",
+        f"│ Active: {active:<12} │ Total: {total:<14} │ RAM: {ram_str:<16} │",
+        "├" + "─" * 70 + "┤",
+        "│ Slowest Routes (Top 5)                                               │"
+    ]
     
-    # Line 1: Top Border
-    lines.append("┌" + "─" * 70 + "┐")
-    
-    # Line 2: Header metrics bar (aligned segments)
-    col1 = f"Active: {active}".ljust(20)
-    col2 = f"Total: {total}".ljust(20)
-    col3 = f"RAM: {ram:.1f} MB".ljust(22)
-    lines.append(f"│ {col1} │ {col2} │ {col3} │")
-    
-    # Line 3: Divider
-    lines.append("├" + "─" * 70 + "┤")
-    
-    # Lines 4-8: Top 5 slow routes slots (Ensure the rows block always yields exactly 5 lines)
+    # 2. Always generate exactly 5 detail rows unconditionally
     for i in range(5):
         if i < len(slow_routes):
             r = slow_routes[i]
@@ -194,11 +189,11 @@ def paint_dashboard():
             
             lines.append(f"│ {status} {method} {path_disp} \x1b[90m{dots}\x1b[0m {stats} │")
         else:
-            # Static placeholder line to maintain perfect layout height
-            content = "- "
-            lines.append(f"│ {content.ljust(68)} │")
+            # Consistent placeholder spacing for empty rows
+            placeholder = "- "
+            lines.append(f"│ {placeholder.ljust(68)} │")
             
-    # Line 9: Bottom Border
+    # 3. Footer row (Fixed)
     lines.append("└" + "─" * 70 + "┘")
     
     dashboard_str = "\n".join(lines) + "\n"
@@ -210,9 +205,9 @@ def paint_dashboard():
             # Force global flush before drawing
             out.flush()
             
-            # Erase previous dashboard (always 9 lines)
+            # Erase previous dashboard (always 10 lines)
             if _dashboard_visible:
-                out.write("\x1b[9A\x1b[J")
+                out.write("\x1b[10A\x1b[J")
                 out.flush()
             out.write(dashboard_str)
             out.flush()
@@ -255,7 +250,7 @@ class StreamInterceptor:
                 out = _get_stdout()
                 with _console_lock:
                     if _dashboard_visible:
-                        out.write("\x1b[9A\x1b[J")
+                        out.write("\x1b[10A\x1b[J")
                         out.flush()
                         _dashboard_visible = False
                         
@@ -283,7 +278,7 @@ class StreamInterceptor:
                 out = _get_stdout()
                 with _console_lock:
                     if _dashboard_visible:
-                        out.write("\x1b[9A\x1b[J")
+                        out.write("\x1b[10A\x1b[J")
                         out.flush()
                         _dashboard_visible = False
                     self.original.write(to_write)

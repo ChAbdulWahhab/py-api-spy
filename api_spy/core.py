@@ -16,8 +16,7 @@ _dashboard_visible = False
 _original_stdout = None
 _original_stderr = None
 
-# Tracks the number of lines printed in the previous render pass for dynamic erasure
-last_printed_lines = 0
+# Fixed height layout height is exactly 9 lines
 
 def _get_stdout():
     return _original_stdout or sys.__stdout__ or sys.stdout
@@ -144,7 +143,7 @@ def is_painting():
     return getattr(_local, "painting", False)
 
 def paint_dashboard():
-    global _dashboard_visible, last_printed_lines
+    global _dashboard_visible
     if not spy_state.enabled:
         return
         
@@ -154,10 +153,6 @@ def paint_dashboard():
         slow_routes = list(spy_state.s)
         
     ram = get_ram_usage()
-    
-    # 72-char wide box boundary calculations
-    W = 72
-    inner_w = W - 4  # 68 characters
     
     lines = []
     
@@ -173,50 +168,37 @@ def paint_dashboard():
     # Line 3: Divider
     lines.append("├" + "─" * 70 + "┤")
     
-    # Line 4: Section title
-    lines.append(f"│ {'Slowest Routes (Top 5)'.ljust(inner_w)} │")
-    
-    # Lines 5-9: Top 5 slow routes slots
+    # Lines 4-8: Top 5 slow routes slots (Ensure the rows block always yields exactly 5 lines)
     for i in range(5):
         if i < len(slow_routes):
-            route = slow_routes[i]
-            m = route["m"]
-            p = route["p"]
-            l = route["l"]
-            h = route["h"]
+            r = slow_routes[i]
+            is_slow = r['l'] > 200
+            status = "\x1b[31m[!]\x1b[0m" if is_slow else "\x1b[32m[✓]\x1b[0m"
+            method = r['m'].ljust(6)
+            path = r['p']
+            stats = f"{int(r['l'])}ms (x{r['h']})"
             
-            fast = l <= 200
-            
-            # Form stats suffix e.g. " 21ms (x4)"
-            stats = f" {l}ms (x{h})"
-            
-            # Indicator text takes 4 visible chars: "[✓] " or "[!] "
-            # Method pad takes 8 visible chars
-            # Path + leaders + stats must equal (inner_w - 4 - 8) = 56 chars
-            # Dot leaders must bridge the rest
-            max_path_len = 56 - len(stats) - 5 # guarantee at least 5 dot-leaders
-            
-            if len(p) > max_path_len:
+            # Truncate path if too long to maintain deterministic W=72 layout
+            max_path_len = 50 - len(stats)
+            if len(path) > max_path_len:
                 if max_path_len > 3:
-                    p_disp = p[:max_path_len - 3] + "..."
+                    path_disp = path[:max_path_len - 3] + "..."
                 else:
-                    p_disp = p[:max_path_len]
+                    path_disp = path[:max_path_len]
             else:
-                p_disp = p
+                path_disp = path
                 
-            num_dots = 56 - len(p_disp) - len(stats)
-            dots = "." * num_dots
+            plain_len = 2 + 4 + 1 + len(method) + 1 + len(path_disp) + 1 + len(stats) + 2
+            dots_count = 72 - plain_len
+            dots = "." * max(1, dots_count)
             
-            # ANSI coloring
-            ansi_indicator = f"\x1b[32m[✓]\x1b[0m " if fast else f"\x1b[31m[!]\x1b[0m "
-            ansi_dots = f"\x1b[90m{dots}\x1b[0m"
-            
-            lines.append(f"│ {ansi_indicator}{m:<8}{p_disp}{ansi_dots}{stats} │")
+            lines.append(f"│ {status} {method} {path_disp} \x1b[90m{dots}\x1b[0m {stats} │")
         else:
-            # Empty slot padding
-            lines.append(f"│ {'-'.ljust(inner_w)} │")
+            # Static placeholder line to maintain perfect layout height
+            content = "- "
+            lines.append(f"│ {content.ljust(68)} │")
             
-    # Line 10: Bottom Border
+    # Line 9: Bottom Border
     lines.append("└" + "─" * 70 + "┘")
     
     dashboard_str = "\n".join(lines) + "\n"
@@ -228,15 +210,13 @@ def paint_dashboard():
             # Force global flush before drawing
             out.flush()
             
-            # Erase previous dashboard dynamically
-            if _dashboard_visible and last_printed_lines > 0:
-                out.write(f"\x1b[{last_printed_lines}A")
-                out.write("\x1b[J")
+            # Erase previous dashboard (always 9 lines)
+            if _dashboard_visible:
+                out.write("\x1b[9A\x1b[J")
                 out.flush()
             out.write(dashboard_str)
             out.flush()
             _dashboard_visible = True
-            last_printed_lines = len(lines)
     except Exception:
         pass
     finally:
@@ -271,12 +251,11 @@ class StreamInterceptor:
                 to_write = self._buffer[:last_nl_idx + 1]
                 self._buffer = self._buffer[last_nl_idx + 1:]
                 
-                global _dashboard_visible, last_printed_lines
+                global _dashboard_visible
                 out = _get_stdout()
                 with _console_lock:
-                    if _dashboard_visible and last_printed_lines > 0:
-                        out.write(f"\x1b[{last_printed_lines}A")
-                        out.write("\x1b[J")
+                    if _dashboard_visible:
+                        out.write("\x1b[9A\x1b[J")
                         out.flush()
                         _dashboard_visible = False
                         
@@ -300,12 +279,11 @@ class StreamInterceptor:
                     to_write += "\n"
                 self._buffer = ""
                 
-                global _dashboard_visible, last_printed_lines
+                global _dashboard_visible
                 out = _get_stdout()
                 with _console_lock:
-                    if _dashboard_visible and last_printed_lines > 0:
-                        out.write(f"\x1b[{last_printed_lines}A")
-                        out.write("\x1b[J")
+                    if _dashboard_visible:
+                        out.write("\x1b[9A\x1b[J")
                         out.flush()
                         _dashboard_visible = False
                     self.original.write(to_write)

@@ -1,0 +1,116 @@
+Metadata-Version: 2.4
+Name: py-api-spy
+Version: 0.1.2
+Summary: A zero-dependency, ultra-lightweight performance terminal dashboard for Python Web Frameworks
+Author: Abdul Wahab
+License: MIT License
+        
+        Copyright (c) 2026 Abdul Wahab
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, and to permit persons to whom the Software is
+        furnished to do so, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+        
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: System :: Monitoring
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Dynamic: license-file
+
+# py-api-spy
+
+[![PyPI version](https://img.shields.io/pypi/v/py-api-spy.svg)](https://pypi.org/project/py-api-spy/)
+[![Python version](https://img.shields.io/pypi/pyversions/py-api-spy.svg)](https://pypi.org/project/py-api-spy/)
+[![License](https://img.shields.io/pypi/l/py-api-spy.svg)](https://pypi.org/project/py-api-spy/)
+
+A zero-dependency, lightweight terminal performance dashboard for Python web frameworks.
+
+This is the Python sibling of the `@chabdulwahab/api-spy` Node.js library. It maintains the identical layout, telemetry keys, and minimalist design philosophy.
+
+## Features
+
+- **Zero Dependencies**: Implemented using only standard Python library modules.
+- **Low Overhead**: Tailored metrics tracking with minimal CPU and memory impact.
+- **Sticky Terminal Dashboard**: Persisted at the bottom of the stdout stream while application logs print normally above it.
+- **Thread Safe**: Concurrent requests are serialized using reentrant locking mechanisms.
+- **Framework Support**: Built-in middlewares for FastAPI / Starlette (ASGI) and Django / DRF (WSGI).
+
+## Installation
+
+Install the package via pip:
+
+```bash
+pip install py-api-spy
+```
+
+## Usage
+
+### FastAPI / Starlette
+
+Add the ASGI middleware to your FastAPI application:
+
+```python
+from fastapi import FastAPI
+from api_spy import ApiSpyMiddleware
+
+app = FastAPI()
+app.add_middleware(ApiSpyMiddleware)
+
+@app.get("/")
+def read_root():
+    return {"hello": "world"}
+```
+
+### Django / DRF
+
+Add the WSGI middleware to your Django `MIDDLEWARE` list in `settings.py`:
+
+```python
+MIDDLEWARE = [
+    # ... other middlewares ...
+    "api_spy.ApiSpyDjangoMiddleware",
+]
+```
+
+## Dashboard Design
+
+The dashboard takes exactly 10 lines and maintains a hardcoded width of 72 characters:
+
+- **Latency States**: Green `[✓]` for fast routes (<= 200ms) and red `[!]` for slow routes (> 200ms).
+- **Dot-leaders**: Dim gray dots linking paths with their corresponding metrics.
+- **Cross-Platform Memory**: Retrieves resident set size (RAM) for Linux, macOS, and Windows.
+
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│ Active: 1          │ Total: 15          │ RAM: 14.5 MB               │
+├──────────────────────────────────────────────────────────────────────┤
+│ Slowest Routes (Top 5)                                               │
+│ [✓] GET     /.............................................. 5ms (x8) │
+│ [!] POST    /api/v1/users.............................. 205ms (x2)   │
+│ -                                                                    │
+│ -                                                                    │
+│ -                                                                    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+## License
+
+MIT

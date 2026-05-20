@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-api-spy"
+version = "0.1.2"
+description = "A zero-dependency, ultra-lightweight performance terminal dashboard for Python Web Frameworks"
+readme = "README.md"
+authors = [
+    { name = "Abdul Wahab" }
+]
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: System :: Monitoring",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+requires-python = ">=3.7"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["api_spy*"]

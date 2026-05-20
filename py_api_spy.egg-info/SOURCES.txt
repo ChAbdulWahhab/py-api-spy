@@ -1,0 +1,11 @@
+LICENSE
+README.md
+pyproject.toml
+api_spy/__init__.py
+api_spy/core.py
+api_spy/django.py
+api_spy/fastapi.py
+py_api_spy.egg-info/PKG-INFO
+py_api_spy.egg-info/SOURCES.txt
+py_api_spy.egg-info/dependency_links.txt
+py_api_spy.egg-info/top_level.txt

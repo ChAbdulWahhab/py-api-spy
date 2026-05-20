@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py-api-spy"
-version = "0.1.4"
+version = "0.1.5"
 description = "A zero-dependency, ultra-lightweight performance terminal dashboard for Python Web Frameworks"
 readme = "README.md"
 authors = [

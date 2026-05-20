@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: py-api-spy
-Version: 0.1.4
+Version: 0.1.5
 Summary: A zero-dependency, ultra-lightweight performance terminal dashboard for Python Web Frameworks
 Author: Abdul Wahab
 License: MIT License

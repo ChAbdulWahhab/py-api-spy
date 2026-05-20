@@ -16,7 +16,8 @@ _dashboard_visible = False
 _original_stdout = None
 _original_stderr = None
 
-# Fixed height layout height is exactly 9 lines
+# Tracks the number of lines printed in the previous render pass for dynamic erasure
+last_printed_lines = 0
 
 def _get_stdout():
     return _original_stdout or sys.__stdout__ or sys.stdout
@@ -143,7 +144,7 @@ def is_painting():
     return getattr(_local, "painting", False)
 
 def paint_dashboard():
-    global _dashboard_visible
+    global _dashboard_visible, last_printed_lines
     if not spy_state.enabled:
         return
         
@@ -205,13 +206,14 @@ def paint_dashboard():
             # Force global flush before drawing
             out.flush()
             
-            # Erase previous dashboard (always 10 lines)
-            if _dashboard_visible:
-                out.write("\x1b[10A\x1b[J")
+            # Erase previous dashboard dynamically
+            if last_printed_lines > 0:
+                out.write(f"\x1b[{last_printed_lines}A\x1b[J")
                 out.flush()
             out.write(dashboard_str)
             out.flush()
             _dashboard_visible = True
+            last_printed_lines = 10
     except Exception:
         pass
     finally:
@@ -221,69 +223,41 @@ class StreamInterceptor:
     def __init__(self, original, is_stderr=False):
         self.original = original
         self.is_stderr = is_stderr
-        self._buffer = ""
         self._lock = threading.Lock()
 
-    def write(self, data):
-        if not data:
+    def write(self, string):
+        if not string:
             return 0
             
-        # Ignore chunks containing border characters or package keywords
-        is_dashboard_chunk = False
-        for token in ("api-spy", "┌", "└", "─", "│", "├", "┐", "┘", "┬", "┴"):
-            if token in data:
-                is_dashboard_chunk = True
-                break
-                
-        if is_painting() or is_dashboard_chunk:
-            return self.original.write(data)
+        # 1. Bypass completely if it's an empty fragment or our own system dashboard drawing
+        if is_painting() or any(x in string for x in ["┌", "┐", "└", "┘", "├", "┤", "Slowest Routes", "api-spy"]):
+            return self.original.write(string)
             
         with self._lock:
-            self._buffer += data
-            if "\n" in self._buffer:
-                # Extract all full lines up to the last newline
-                last_nl_idx = self._buffer.rfind("\n")
-                to_write = self._buffer[:last_nl_idx + 1]
-                self._buffer = self._buffer[last_nl_idx + 1:]
-                
-                global _dashboard_visible
-                out = _get_stdout()
-                with _console_lock:
-                    if _dashboard_visible:
-                        out.write("\x1b[10A\x1b[J")
-                        out.flush()
-                        _dashboard_visible = False
-                        
-                    self.original.write(to_write)
-                    self.original.flush()
+            # 2. Before letting ANY log print, clear the previous footprint safely
+            global last_printed_lines, _dashboard_visible
+            out = _get_stdout()
+            with _console_lock:
+                if last_printed_lines > 0:
+                    # Move up, wipe down cleanly
+                    out.write(f"\x1b[{last_printed_lines}A\x1b[J")
+                    out.flush()
+                    last_printed_lines = 0  # Reset token until next repaint passes
+                    _dashboard_visible = False
                     
-                paint_dashboard()
-                return len(data)
-            else:
-                return len(data)
+                # 3. Write the actual clean application log
+                self.original.write(string)
+                self.original.flush()
+                
+            # 4. Instantly snap the dashboard frame back down to the absolute bottom
+            paint_dashboard()
+            return len(string)
 
     def writelines(self, lines):
         for line in lines:
             self.write(line)
 
     def flush(self):
-        with self._lock:
-            if self._buffer:
-                to_write = self._buffer
-                if not to_write.endswith("\n"):
-                    to_write += "\n"
-                self._buffer = ""
-                
-                global _dashboard_visible
-                out = _get_stdout()
-                with _console_lock:
-                    if _dashboard_visible:
-                        out.write("\x1b[10A\x1b[J")
-                        out.flush()
-                        _dashboard_visible = False
-                    self.original.write(to_write)
-                    self.original.flush()
-                paint_dashboard()
         self.original.flush()
 
     def __getattr__(self, attr):
@@ -342,7 +316,7 @@ def start_spy():
     paint_dashboard()
 
 def stop_spy():
-    global _original_stdout, _original_stderr, _dashboard_visible
+    global _original_stdout, _original_stderr, _dashboard_visible, last_printed_lines
     with spy_state.lock:
         if not spy_state.enabled:
             return
@@ -356,7 +330,8 @@ def stop_spy():
         
         # Cleanly erase final dashboard from the viewport
         with _console_lock:
-            if _dashboard_visible:
-                sys.stdout.write("\r\x1b[10A\x1b[J")
+            if last_printed_lines > 0:
+                sys.stdout.write(f"\r\x1b[{last_printed_lines}A\x1b[J")
                 sys.stdout.flush()
-                _dashboard_visible = False
+                last_printed_lines = 0
+            _dashboard_visible = False
